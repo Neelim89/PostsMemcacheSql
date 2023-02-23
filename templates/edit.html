@@ -1,0 +1,37 @@
+{# This is similar to the code in the create.html template, except for displaying
+   the post title inside the page’s title in the line {% block title %} Edit
+   "{{ post['title'] }}" {% endblock %}, the value of the input in
+   {{ request.form['title'] or post['title'] }}, and the value of the text area
+   in {{ request.form['content'] or post['content'] }}. This displays the data stored
+   in the request if it exists; otherwise it displays the data from the post variable
+   that was passed to the template containing current database data. #}
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Edit "{{ post['title'] }}" {% endblock %}</h1>
+    <form method="post">
+        <label for="title">Title</label>
+        <br>
+        <input type="text" name="title"
+               placeholder="Post title"
+               value="{{ request.form['title'] or post['title'] }}"></input>
+        <br>
+
+        <label for="content">Post Content</label>
+        <br>
+        <textarea name="content"
+                  placeholder="Post content"
+                  rows="15"
+                  cols="60"
+                  >{{ request.form['content'] or post['content'] }}</textarea>
+        <br>
+        <button type="submit">Submit</button>
+    </form>
+
+    <hr>
+    <form action="{{ url_for('delete', id=post['id']) }}" method="POST">
+        <input type="submit" value="Delete Post"
+                onclick="return confirm('Are you sure you want to delete this post?')">
+    </form>
+{% endblock %}

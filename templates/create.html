@@ -1,0 +1,38 @@
+{## You extend the base template, set a heading as a title,
+    and use a <form> tag with the attribute method set to post
+    to indicate that the form will submit a POST request.
+    You have a text field with the name title, which you’ll use
+    to access the title data in your /create route. You set
+    the value of the text field to request.form['title'] which
+    is either empty or a saved version of the title if the form is invalid,
+    so that the title does not get lost when things go wrong.
+
+    After the title input field, you add a text area named content with
+    the value {{ request.form['content'] }} to restore post content if
+    the form is invalid.
+
+    Last, you have a Submit button at the end of the form. ##}
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Add a New Post {% endblock %}</h1>
+    <form method="post">
+        <label for="title">Title</label>
+        <br>
+        <input type="text" name="title"
+               placeholder="Post title"
+               value="{{ request.form['title'] }}"></input>
+        <br>
+
+        <label for="content">Post Content</label>
+        <br>
+        <textarea name="content"
+                  placeholder="Post content"
+                  rows="15"
+                  cols="60"
+                  >{{ request.form['content'] }}</textarea>
+        <br>
+        <button type="submit">Submit</button>
+    </form>
+{% endblock %}
