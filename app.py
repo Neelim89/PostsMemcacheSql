@@ -11,6 +11,19 @@ import postsMemcache as memcacheInterface
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your secret key'
 
+def storeCacheToDb():
+    allCachedPosts = memcacheInterface.getAllPostsFromMemcache()
+    dbInterface.updatePostsInDb(allCachedPosts)
+
+def loadDbToCache():
+    allStoredPosts = dbInterface.getAllPostsFromDb()
+    memcacheInterface.loadPostsIntoMemcache(allStoredPosts)
+
+def startup():
+    loadDbToCache()
+
+startup()
+
 # You use the route /<int:id>/edit/, with int: being a converter that accepts positive integers.
 # And id is the URL variable that will determine the post you want to edit. For example,
 # /2/edit/ will allow you to edit the post with the ID of 2. The ID is passed from the URL
@@ -89,7 +102,6 @@ def create():
 @app.route('/<int:id>/delete/', methods=('POST',))
 def delete(id):
     post = memcacheInterface.deletePostInMemcache(id)
-    delete_post_in_db(id)
     flash('"{}" was successfully deleted!'.format(post['title']))
     return redirect(url_for('index'))
 
@@ -105,39 +117,6 @@ def delete(id):
 @app.route('/')
 def index():
     # get the posts from memcache
-    useCache = True
-    postIds = None
-    if useCache:
-        postIds = memcacheClient.get('AllCachedPostsIds')
-        if postIds:
-            postIds = json.loads(postIds.decode("utf-8"))
-    else:
-        posts = None
-
-    # if memcache returns null, that is, there are no posts cached, then look in the SQL database
-    # and then store in memcache
-    if not postIds:
-        conn = get_db_connection()
-        posts = conn.execute('SELECT * FROM posts').fetchall()
-        conn.close()
-        postIds = []
-        for post in posts:
-            memcacheClient.set(str(post['id']), json.dumps(post))
-            postIds.append(post['id'])
-        memcacheClient.set('AllCachedPostsIds', postIds)
-    else:
-        print(f'Using cache, postIds = {postIds}')
-        posts = []
-        for postId in postIds:
-            post = memcacheClient.get(str(postId))
-            posts.append(json.loads(post.decode("utf-8")))
+    posts = memcacheInterface.getAllPostsFromMemcache()
 
     return render_template('index.html', posts=posts)
-
-def storeCacheToDb():
-    allCachedPosts = memcacheInterface.getAllPostsFromMemcache()
-    dbInterface.updatePostsInDb(allCachedPosts)
-
-def loadDbToCache():
-    allStoredPosts = dbInterface.getAllPostsFromDb()
-    memcacheInterface.loadPostsIntoMemcache(allStoredPosts)

@@ -7,30 +7,32 @@ from enum import Enum
 # Setup a memcache client
 memcacheClient = base.Client('localhost')
 
-def addPostIdToMemcache(postid):
-    allPostIds = memcacheClient.get("AllPostIds")
-    if (allPostIds.get(postid) is None):
-        allPostIds.append(postid)
-    memcacheClient.set("AllPostIds", allPostIds)
+def initMemcache():
+    memcacheClient.set('AllPostIds', [])
 
-def delPostIdFromMemcache(postid):
-    allPostIds = memcacheClient.get("AllPostIds")
-    if (allPostIds.get(postid) is not None):
-        allPostIds.remove(postid)
-    memcacheClient.set("AllPostIds", allPostIds)
-
-def getPostFromMemcache(post):
-    post_id_str = str(post['id'])
+def getPostFromMemcache(postid):
+    post_id_str = str(postid)
     memcachedPost = memcacheClient.get(post_id_str)
-    post = json.loads(memcachedPost.decode("utf-8"))
+    if (memcachedPost is not None):
+        post = json.loads(memcachedPost)
+    else:
+        post = None
     return post
+
+def addPostIdToMemcache(postid):
+    memcachedIds = memcacheClient.get('AllPostIds')
+    if (memcachedIds is not None):
+        allPostIds = json.loads(memcachedIds)
+        if (allPostIds.count(postid) == 0):
+            allPostIds.append(postid)
+            memcacheClient.set('AllPostIds', json.dumps(allPostIds))
 
 def setOrCreatePostInMemcache(post):
     post_id_str = str(post['id'])
     memcachedPost = memcacheClient.set(str(post_id_str), json.dumps(post))
     # Append the key in memcache as a value to store what posts are stored
     # in the memcache
-    addPostIdToMemcache(post_id_str)
+    addPostIdToMemcache(post['id'])
 
 def loadPostsIntoMemcache(posts):
     for post in posts:
@@ -40,23 +42,36 @@ def updatePostInMemcache(post_id, title, content):
     # need get the existing post from memcache since it has the other information
     # such as created date
     post = getPostFromMemcache(post_id)
-    # Update the post with the new title and content
-    post['title'] = title
-    post['content'] = content
-    # update in memcache
-    setOrCreatePostInMemcache(post)
+    if (post is not None):
+        # Update the post with the new title and content
+        post['title'] = title
+        post['content'] = content
+        print(f'Updated post: {post}')
+        # update in memcache
+        setOrCreatePostInMemcache(post)
 
-def deletePostInMemcacheUsingPostObj(post):
-    post_id_str = str(post['id'])
-    memcacheClient.delete(post_id_str)
-    delPostIdFromMemcache(post['id'])
+def delPostIdFromMemcache(postid):
+    allPostIds = json.loads(memcacheClient.get("AllPostIds"))
+    if (allPostIds.count(postid) > 0):
+        allPostIds.remove(postid)
+        memcacheClient.set('AllPostIds', json.dumps(allPostIds))
+
+def deletePostInMemcache(id):
+    post_id_str = str(id)
+    isPostDeleteSuccess = memcacheClient.delete(post_id_str, False)
+    if isPostDeleteSuccess:
+        delPostIdFromMemcache(id)
+    return isPostDeleteSuccess
 
 def getAllPostsFromMemcache():
     # First we need to get the post ids from memcache to know what
     # posts are stored in the cache
     allPosts = []
-    allPostIds = memcacheClient.get("AllPostIds")
-    for postid in allPostIds:
-        memcachedPost = memcacheClient.get(postid)
-        allPosts.append(memcachedPost)
+    memcachedIds = memcacheClient.get('AllPostIds')
+    if (memcachedIds is not None):
+        allPostIdsMemcache = json.loads(memcachedIds)
+        if (allPostIdsMemcache is not None):
+            for postid in allPostIdsMemcache:
+                memcachedPost = getPostFromMemcache(postid)
+                allPosts.append(memcachedPost)
     return allPosts
