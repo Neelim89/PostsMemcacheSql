@@ -1,8 +1,6 @@
 
 import json
 from pymemcache.client import base
-import postsSql as dbInterface
-from enum import Enum
 
 # Setup a memcache client
 memcacheClient = base.Client('localhost')
@@ -19,6 +17,10 @@ def getPostFromMemcache(postid):
         post = None
     return post
 
+# def getMultiplePostsFromMemcache(postIdIntArray):
+#     postIdStrArr = []
+#     for postIdNum : postIdIntArray:
+
 def addPostIdToMemcache(postid):
     memcachedIds = memcacheClient.get('AllPostIds')
     if (memcachedIds is not None):
@@ -27,11 +29,14 @@ def addPostIdToMemcache(postid):
             allPostIds.append(postid)
             memcacheClient.set('AllPostIds', json.dumps(allPostIds))
 
+# Takes a post object and inserts it into the memcache
 def setOrCreatePostInMemcache(post):
     post_id_str = str(post['id'])
-    memcachedPost = memcacheClient.set(str(post_id_str), json.dumps(post))
+    memcacheClient.set(str(post_id_str), json.dumps(post))
     # Append the key in memcache as a value to store what posts are stored
     # in the memcache
+    # Store it as a string since memcache epects its
+    # addPostIdToMemcache(str(post['id']))
     addPostIdToMemcache(post['id'])
 
 def loadPostsIntoMemcache(posts):
@@ -67,11 +72,15 @@ def getAllPostsFromMemcache():
     # First we need to get the post ids from memcache to know what
     # posts are stored in the cache
     allPosts = []
+    allPostIdsMemcache = getAllPostIdsStoredInMemcache()
+    for postid in allPostIdsMemcache:
+        memcachedPost = getPostFromMemcache(postid)
+        allPosts.append(memcachedPost)
+    return allPosts
+
+def getAllPostIdsStoredInMemcache():
+    allPostIdsMemcache = []
     memcachedIds = memcacheClient.get('AllPostIds')
     if (memcachedIds is not None):
         allPostIdsMemcache = json.loads(memcachedIds)
-        if (allPostIdsMemcache is not None):
-            for postid in allPostIdsMemcache:
-                memcachedPost = getPostFromMemcache(postid)
-                allPosts.append(memcachedPost)
-    return allPosts
+    return allPostIdsMemcache

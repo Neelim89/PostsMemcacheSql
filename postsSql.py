@@ -25,11 +25,23 @@ def getDbConnection():
     conn.row_factory = dictFactory
     return conn
 
-def createPostInDb(title, content):
+def createPostInDbWithTc(title, content):
     createSuccessful = False
     conn = getDbConnection()
     cursor = conn.execute('INSERT INTO posts (title, content) VALUES (?, ?)',
                     (title, content))
+    conn.commit()
+    conn.close()
+    if (cursor.rowcount == 1):
+        createSuccessful = True
+
+    return createSuccessful
+
+def createPostInDbWithId(id, title, content):
+    createSuccessful = False
+    conn = getDbConnection()
+    cursor = conn.execute('INSERT INTO posts (id, title, content) VALUES (?, ?, ?)',
+                    (id, title, content))
     conn.commit()
     conn.close()
     if (cursor.rowcount == 1):
@@ -69,6 +81,12 @@ def deletePostInDb(post_id):
     conn.commit()
     conn.close()
 
+def deleteAllPostsInDb():
+    conn = getDbConnection()
+    conn.execute('DELETE FROM posts')
+    conn.commit()
+    conn.close()
+
 def getAllPostsFromDb():
     conn = getDbConnection()
     posts = conn.execute('SELECT * FROM posts',).fetchall()
@@ -76,5 +94,11 @@ def getAllPostsFromDb():
     return posts
 
 def updatePostsInDb(posts):
+    conn = getDbConnection()
+    conn.execute('DELETE FROM posts')
+    conn.commit()
+    conn.close()
+    postsUpdateSuccessful = False
     for post in posts:
-        updatePostInDb(post['id'], post['title'], post['content'])
+        postsUpdateSuccessful = createPostInDbWithId(post['id'], post['title'], post['content'])
+    return postsUpdateSuccessful
