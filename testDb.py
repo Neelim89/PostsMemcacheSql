@@ -90,6 +90,7 @@ print(f'Time it took to create a post in sql database is {endTime - startTime}')
 
 startTime = time.perf_counter()
 allPosts = dbInterface.getAllPostsFromDb()
+print(f'All posts from db:\n{allPosts}')
 endTime = time.perf_counter()
 print(f'Time it took to get all posts from database is {endTime - startTime}')
 
