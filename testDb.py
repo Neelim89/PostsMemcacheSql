@@ -11,11 +11,23 @@ dbInterface.createPostInDbWithId(5, 'mypost5', 'mycontent5')
 dbInterface.createPostInDbWithId(6, 'mypost6', 'mycontent6')
 # # mypost = dbInterface.getPostFromDb(100)
 # # print(mypost)
-# allPosts = dbInterface.getAllPostsFromDb()
 # dbInterface.deletePostInDb(8)
 # allPosts = dbInterface.getAllPostsFromDb()
 # dbInterface.updatePostInDb(12, 'mynew', 'new')
 # print(allPosts)
+
+allDbPosts = dbInterface.getAllPostsFromDb()
+
+memcacheInterface.initMemcache()
+
+memcacheInterface.loadPostsIntoMemcache(allDbPosts)
+allMemcachedPosts = memcacheInterface.getAllPostsFromMemcache()
+print('Posts retrieved from memcache:\n')
+for post in allMemcachedPosts:
+    print(f'{post}\n')
+print('=========================\n')
+
+memcacheInterface.updatePostInMemcache(3, 'myNewpost3', 'myNewcontent3')
 
 updateSuccessful = dbInterface.updatePostInDb(5, 'newtitle!', 'newcontent!')
 print(f'updateSuccessful = {updateSuccessful}\n')
@@ -23,14 +35,6 @@ allDbPosts = dbInterface.getAllPostsFromDb()
 for post in allDbPosts:
     print(f'{post}\n')
 print('=========================\n')
-memcacheInterface.initMemcache()
-
-memcacheInterface.loadPostsIntoMemcache(allDbPosts)
-# allMemcachedPosts = memcacheInterface.getAllPostsFromMemcache()
-# print('Posts retrieved from memcache:\n')
-# for post in allMemcachedPosts:
-#     print(f'{post}\n')
-# print('=========================\n')
 
 memcacheInterface.updatePostInMemcache(5, 'I have something to say', 'I said something')
 allMemcachedPosts = memcacheInterface.getAllPostsFromMemcache()
@@ -54,18 +58,20 @@ print('=========================\n')
 #     print(f'Post: {post}\n')
 # else:
 #     print(f'There is no post found with id 13\n')
-deletionSuccess = memcacheInterface.deletePostInMemcache(13)
-if (deletionSuccess):
-    print('Deletion success, need to delete from db')
-    dbInterface.deletePostInDb(13)
-else:
-    print('Deletion fail')
+# deletionSuccess = memcacheInterface.deletePostInMemcache(13)
+# if (deletionSuccess):
+#     print('Deletion success, need to delete from db')
+#     dbInterface.deletePostInDb(13)
+# else:
+#     print('Deletion fail')
 
+memcacheInterface.createNewPostInMemcache('The newest Post', 'The newest Content')
 
 allMemcachedPosts = memcacheInterface.getAllPostsFromMemcache()
 for post in allMemcachedPosts:
     print(f'{post}\n')
 print('=========================\n')
+
 postsUpdateSuccssful = dbInterface.updatePostsInDb(allMemcachedPosts)
 print(f'Database update success: {postsUpdateSuccssful}')
 allDbPosts = dbInterface.getAllPostsFromDb()
@@ -75,36 +81,41 @@ for post in allDbPosts:
 print('=========================\n')
 # print(f'Posts retrieved from database: {allDbPosts}\n=========================\n')
 
-# memcacheInterface.setOrCreatePostInMemcache()
+# memcacheInterface.setPostInMemcache()
 
-newPost = {'id' : 7, 'title' : 'mypost7', 'content' : 'mycontent7'}
-startTime = time.perf_counter()
-memcacheInterface.setOrCreatePostInMemcache(newPost)
-endTime = time.perf_counter()
-print(f'Time it took to create a post in memcache is {endTime - startTime}')
+# newPost = {'id' : 7, 'title' : 'mypost7', 'content' : 'mycontent7'}
+# startTime = time.perf_counter()
+# memcacheInterface.setPostInMemcache(newPost)
+# endTime = time.perf_counter()
+# print(f'Time it took to create a post in memcache is {endTime - startTime}')
 
-startTime = time.perf_counter()
-dbInterface.createPostInDbWithId(newPost['id'], newPost['title'], newPost['content'])
-endTime = time.perf_counter()
-print(f'Time it took to create a post in sql database is {endTime - startTime}')
+# startTime = time.perf_counter()
+# dbInterface.createPostInDbWithId(newPost['id'], newPost['title'], newPost['content'])
+# endTime = time.perf_counter()
+# print(f'Time it took to create a post in sql database is {endTime - startTime}')
 
-startTime = time.perf_counter()
-allPosts = dbInterface.getAllPostsFromDb()
-print(f'All posts from db:\n{allPosts}')
-endTime = time.perf_counter()
-print(f'Time it took to get all posts from database is {endTime - startTime}')
+# startTime = time.perf_counter()
+# allPosts = dbInterface.getAllPostsFromDb()
+# endTime = time.perf_counter()
+# print(f'Time it took to get all posts from database is {endTime - startTime}')
 
-startTime = time.perf_counter()
-allPosts = memcacheInterface.getAllPostsFromMemcache()
-endTime = time.perf_counter()
-print(f'Time it took to get all posts from memcache is {endTime - startTime}')
+# startTime = time.perf_counter()
+# allPosts = memcacheInterface.getAllPostsFromMemcache()
+# endTime = time.perf_counter()
+# # print(f'Time it took to get all posts from memcache is {endTime - startTime}')
 
-startTime = time.perf_counter()
-memcacheInterface.getPostFromMemcache(1)
-endTime = time.perf_counter()
-print(f'Time it took to get post id 1 from memcache is {endTime - startTime}')
 
-startTime = time.perf_counter()
-dbInterface.getPostFromDb(1)
-endTime = time.perf_counter()
-print(f'Time it took to get post id 1 from database is {endTime - startTime}')
+# startTime = time.perf_counter()
+# allPosts = memcacheInterface.getAllPostsFromMemcache()
+# endTime = time.perf_counter()
+# print(f'Time it took to get all posts from memcache is {endTime - startTime}')
+
+# startTime = time.perf_counter()
+# memcacheInterface.getPostFromMemcache(1)
+# endTime = time.perf_counter()
+# print(f'Time it took to get post id 1 from memcache is {endTime - startTime}')
+
+# startTime = time.perf_counter()
+# dbInterface.getPostFromDb(1)
+# endTime = time.perf_counter()
+# print(f'Time it took to get post id 1 from database is {endTime - startTime}')
