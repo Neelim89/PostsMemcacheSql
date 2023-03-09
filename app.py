@@ -2,27 +2,25 @@
 # Then you import the Flask class and the render_template() function from the
 # flask package. You make a Flask application instance called app.
 
+from pymemcache.client import base
 from flask import Flask, render_template, request, url_for, flash, redirect
 import pdb
 
 import postsSql as dbInterface
-import postsMemcache as memcacheInterface
+import postsMemcache as memcachePostsInterface
 
+# This is a seperate cache to hold the webpages
+webpagecache = base.Client('localhost')
+# webpagecache.flush_all()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your secret key'
 
-def storeCacheToDb():
-    allCachedPosts = memcacheInterface.getAllPostsFromMemcache()
-    dbInterface.updatePostsInDb(allCachedPosts)
-
-def loadDbToCache():
-    allStoredPosts = dbInterface.getAllPostsFromDb()
-    memcacheInterface.loadPostsIntoMemcache(allStoredPosts)
-
-def startup():
-    loadDbToCache()
-
-startup()
+def getPost(id):
+    post = memcachePostsInterface.getPostFromMemcache(id)
+    if (post is None):
+        post = dbInterface.getPostFromDb(id)
+        memcachePostsInterface.setPostInMemcache(post)
+    return post
 
 # You use the route /<int:id>/edit/, with int: being a converter that accepts positive integers.
 # And id is the URL variable that will determine the post you want to edit. For example,
@@ -39,6 +37,9 @@ startup()
 # If the form is valid, you open a database connection and use the UPDATE SQL statement to update the posts table by setting the new title and new content, where the ID of the post in the database is equal to the ID that was in the URL. You commit the transaction, close the connection, and redirect to the index page.
 @app.route('/<int:id>/edit/', methods=('GET', 'POST'))
 def edit(id):
+    post = getPost(id)
+    # Create a memcache key for the edit page for the specific post
+    memcacheEditKey = "editPage"+str(id)
     if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
@@ -50,11 +51,24 @@ def edit(id):
             flash('Content is required!')
 
         else:
-            # Update the SQL database
-            update_post_in_db(id, title, content)
+            # Update both memcache and the SQL database; the memcache updatePostInMemcache
+            # checks if the post is in the cache before trying to update it, so if the post
+            # wasn't cached the updatePostInMemcache call won't result in an error
+            memcachePostsInterface.updatePostInMemcache(id, title, content)
+            dbUpdateSuccessful = dbInterface.updatePostInDb(id, title, content)
+            if dbUpdateSuccessful:
+                # Cached index webpage is now invalid, so delete it from memcache if it exists
+                webpagecache.delete("index")
+                post['title'] = title
+                post['content'] = content
+                editPage = render_template('edit.html', post=post)
+                webpagecache.set(memcacheEditKey, editPage)
             return redirect(url_for('index'))
-
-    return render_template('edit.html', post=post)
+    editPage = webpagecache.get(memcacheEditKey)
+    if(editPage is None):
+        editPage = render_template('edit.html', post=post)
+        webpagecache.set(memcacheEditKey, editPage)
+    return editPage
 
 # In this route, you pass the tuple ('GET', 'POST') to the methods parameter to allow both GET
 # and POST requests. GET requests are used to retrieve data from the server. POST requests are
@@ -81,10 +95,22 @@ def create():
         elif not content:
             flash('Content is required!')
         else:
-            create_post_in_db(title, content)
+            # We only create the post in the database, it doesn't make sense to
+            # cache it until another user retreives the post since it hasn't shown
+            # popularity in it yet
+            dbUpdateSuccessful = dbInterface.createPostInDb(title, content)
+            if dbUpdateSuccessful:
+                # Cached index webpage is now invalid, so delete it from memcache if it exists
+                webpagecache.delete("index")
             return redirect(url_for('index'))
 
-    return render_template('create.html')
+    # Cache the create page since it doesn't change after initially navigating to
+    # this page
+    createPage = webpagecache.get("createPage")
+    if (createPage is None):
+        createPage = render_template('create.html')
+        webpagecache.set("createPage", createPage)
+    return createPage
 
 # This view function only accepts POST requests in the methods parameter. This means that
 # navigating to the /ID/delete route on your browser will return a 405 Method Not Allowed
@@ -101,9 +127,19 @@ def create():
 # to the Edit page.
 @app.route('/<int:id>/delete/', methods=('POST',))
 def delete(id):
-    post = memcacheInterface.deletePostInMemcache(id)
-    flash('"{}" was successfully deleted!'.format(post['title']))
+    post = getPost(id)
+    isPostDeleteSuccess = dbInterface.deletePostInDb(id)
+    if isPostDeleteSuccess:
+        memcachePostsInterface.deletePostInMemcache(id)
+        flash('"{}" was successfully deleted!'.format(post['title']))
+        # Cached index webpage is now invalid, so delete it from memcache
+        webpagecache.delete("index")
     return redirect(url_for('index'))
+
+def createIndexWebpageFromDb():
+    posts = dbInterface.getAllPostsFromDb()
+    indexWebpage = render_template('index.html', posts=posts)
+    return indexWebpage
 
 # You then use the app.route() decorator to create a Flask view function called index().
 # You use the get_db_connection() function to open a database connection. Then you execute
@@ -116,7 +152,11 @@ def delete(id):
 # the blog posts in the index.html template.
 @app.route('/')
 def index():
-    # get the posts from memcache
-    posts = memcacheInterface.getAllPostsFromMemcache()
+    cachedIndexWebpage = webpagecache.get("index")
+    if (cachedIndexWebpage is not None):
+        indexWebpage = cachedIndexWebpage
+    else:
+        indexWebpage = createIndexWebpageFromDb()
+        webpagecache.set("index", indexWebpage)
 
-    return render_template('index.html', posts=posts)
+    return indexWebpage
