@@ -2,25 +2,38 @@
 # Then you import the Flask class and the render_template() function from the
 # flask package. You make a Flask application instance called app.
 
+import sqlite3
 from pymemcache.client import base
+from pymemcache.exceptions import MemcacheUnknownError
 from flask import Flask, render_template, request, url_for, flash, redirect
 import pdb
+import logging
 
 import postsSql as dbInterface
-import postsMemcache as memcachePostsInterface
+import postsMemcache as mcPostsInterface
 
+logging.basicConfig(filename='record.log', level=logging.DEBUG)
 # This is a seperate cache to hold the webpages
 webpagecache = base.Client('localhost')
-# webpagecache.flush_all()
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your secret key'
 
 def getPost(id):
-    post = memcachePostsInterface.getPostFromMemcache(id)
+    post = mcPostsInterface.getPostFromMemcache(id)
     if (post is None):
         post = dbInterface.getPostFromDb(id)
-        memcachePostsInterface.setPostInMemcache(post)
+        mcPostsInterface.setPostInMemcache(post)
     return post
+
+def deletePostMcDb(id):
+    mcPostsInterface.deletePostInMemcache(id)
+    dbInterface.deletePostInDb(id)
+
+def updatePostMcDb(id, newtitle, newcontent):
+    # mcPostsInterface.updatePostInMemcache(id, newtitle, newcontent)
+    mcPostsInterface.deletePostInMemcache(id)
+    dbInterface.updatePostInDb(id, newtitle, newcontent)
 
 # You use the route /<int:id>/edit/, with int: being a converter that accepts positive integers.
 # And id is the URL variable that will determine the post you want to edit. For example,
@@ -38,8 +51,6 @@ def getPost(id):
 @app.route('/<int:id>/edit/', methods=('GET', 'POST'))
 def edit(id):
     post = getPost(id)
-    # Create a memcache key for the edit page for the specific post
-    memcacheEditKey = "editPage"+str(id)
     if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
@@ -51,24 +62,13 @@ def edit(id):
             flash('Content is required!')
 
         else:
-            # Update both memcache and the SQL database; the memcache updatePostInMemcache
-            # checks if the post is in the cache before trying to update it, so if the post
-            # wasn't cached the updatePostInMemcache call won't result in an error
-            memcachePostsInterface.updatePostInMemcache(id, title, content)
-            dbUpdateSuccessful = dbInterface.updatePostInDb(id, title, content)
-            if dbUpdateSuccessful:
-                # Cached index webpage is now invalid, so delete it from memcache if it exists
-                webpagecache.delete("index")
-                post['title'] = title
-                post['content'] = content
-                editPage = render_template('edit.html', post=post)
-                webpagecache.set(memcacheEditKey, editPage)
+            updatePostMcDb(id, title, content)
+            # Cached index webpage is now invalid, so delete it from memcache if it exists
+            webpagecache.delete("index")
+
             return redirect(url_for('index'))
-    editPage = webpagecache.get(memcacheEditKey)
-    if(editPage is None):
-        editPage = render_template('edit.html', post=post)
-        webpagecache.set(memcacheEditKey, editPage)
-    return editPage
+
+    return render_template('edit.html', post=post)
 
 # In this route, you pass the tuple ('GET', 'POST') to the methods parameter to allow both GET
 # and POST requests. GET requests are used to retrieve data from the server. POST requests are
@@ -98,10 +98,9 @@ def create():
             # We only create the post in the database, it doesn't make sense to
             # cache it until another user retreives the post since it hasn't shown
             # popularity in it yet
-            dbUpdateSuccessful = dbInterface.createPostInDb(title, content)
-            if dbUpdateSuccessful:
-                # Cached index webpage is now invalid, so delete it from memcache if it exists
-                webpagecache.delete("index")
+            dbInterface.createPostInDb(title, content)
+            # Cached index webpage is now invalid, so delete it from memcache if it exists
+            webpagecache.delete("index")
             return redirect(url_for('index'))
 
     # Cache the create page since it doesn't change after initially navigating to
@@ -111,6 +110,26 @@ def create():
         createPage = render_template('create.html')
         webpagecache.set("createPage", createPage)
     return createPage
+
+# Method to allow for JMeter to issue post commands that create posts with a specific id
+@app.route('/createwithid/', methods=('POST',))
+def createWithId():
+    id = request.form['id']
+    title = request.form['title']
+    content = request.form['content']
+    dbInterface.createPostInDbWithId(id, title, content)
+    webpagecache.delete("index")
+    return redirect(url_for('index'))
+
+# Method to allow for JMeter to issue post commands that create posts without specifying an id
+@app.route('/createnoid/', methods=('POST',))
+def createNoId():
+    title = request.form['title']
+    content = request.form['content']
+    dbInterface.createPostInDb(title, content)
+    # Cached index webpage is now invalid, so delete it from memcache if it exists
+    webpagecache.delete("index")
+    return redirect(url_for('index'))
 
 # This view function only accepts POST requests in the methods parameter. This means that
 # navigating to the /ID/delete route on your browser will return a 405 Method Not Allowed
@@ -128,12 +147,10 @@ def create():
 @app.route('/<int:id>/delete/', methods=('POST',))
 def delete(id):
     post = getPost(id)
-    isPostDeleteSuccess = dbInterface.deletePostInDb(id)
-    if isPostDeleteSuccess:
-        memcachePostsInterface.deletePostInMemcache(id)
-        flash('"{}" was successfully deleted!'.format(post['title']))
-        # Cached index webpage is now invalid, so delete it from memcache
-        webpagecache.delete("index")
+    deletePostMcDb(id)
+    flash('"{}" was successfully deleted!'.format(post['title']))
+    # Cached index webpage is now invalid, so delete it from memcache
+    webpagecache.delete("index")
     return redirect(url_for('index'))
 
 def createIndexWebpageFromDb():
@@ -153,6 +170,7 @@ def createIndexWebpageFromDb():
 @app.route('/')
 def index():
     cachedIndexWebpage = webpagecache.get("index")
+
     if (cachedIndexWebpage is not None):
         indexWebpage = cachedIndexWebpage
     else:

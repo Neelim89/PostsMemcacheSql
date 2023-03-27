@@ -1,4 +1,4 @@
-# You first import the sqlite3 module. You open a connection to
+#You first import the sqlite3 module. You open a connection to
 # a database file named database.db, which will be created once
 # you run the Python file. Then you use the open() function to
 # open the schema.sql file. Next you execute its contents using
@@ -17,14 +17,6 @@ with open('schema.sql') as f:
     connection.executescript(f.read())
 
 cur = connection.cursor()
-
-cur.execute("INSERT INTO posts (title, content) VALUES (?, ?)",
-            ('First Post', 'Content for the first post')
-            )
-
-cur.execute("INSERT INTO posts (title, content) VALUES (?, ?)",
-            ('Second Post', 'Content for the second post')
-            )
 
 connection.commit()
 connection.close()

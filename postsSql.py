@@ -26,29 +26,27 @@ def getDbConnection():
     return conn
 
 def createPostInDb(title, content):
-    createSuccessful = False
     conn = getDbConnection()
-    cursor = conn.execute('INSERT INTO posts (title, content) VALUES (?, ?)',
+    conn.execute('INSERT INTO posts (title, content) VALUES (?, ?)',
                     (title, content))
     conn.commit()
     conn.close()
-    if (cursor.rowcount == 1):
-        createSuccessful = True
 
-    return createSuccessful
+def createPostInDbWithId(id, title, content):
+    conn = getDbConnection()
+    conn.execute('INSERT INTO posts (id, title, content) VALUES (?, ?, ?)',
+                    (id, title, content))
+    conn.commit()
+    conn.close()
 
 def updatePostInDb(post_id, title, content):
     updateSuccessful = False
     conn = getDbConnection()
-    cursor = conn.execute('UPDATE posts SET title = ?, content = ?'
+    conn.execute('UPDATE posts SET title = ?, content = ?'
                 ' WHERE id = ?',
                 (title, content, post_id))
     conn.commit()
     conn.close()
-    if (cursor.rowcount == 1):
-        updateSuccessful = True
-
-    return updateSuccessful
 
 # This function has a post_id argument that determines what post to retrieve and return.
 # You open a database connection with get_db_connection() and execute an SQL query to get the
@@ -66,13 +64,8 @@ def getPostFromDb(post_id):
 def deletePostInDb(post_id):
     conn = getDbConnection()
     cursor = conn.execute('DELETE FROM posts WHERE id = ?', (post_id,))
-    if (cursor.rowcount == 1):
-        deleteSuccessful = True
-    else:
-        deleteSuccessful = False
     conn.commit()
     conn.close()
-    return deleteSuccessful
 
 def deleteAllPostsInDb():
     conn = getDbConnection()

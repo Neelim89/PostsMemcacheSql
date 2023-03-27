@@ -10,15 +10,13 @@ def getPostFromMemcache(postid):
     post_id_str = str(postid)
     memcachedPost = memcacheClient.get(post_id_str)
     if (memcachedPost is not None):
-        post = pickle.loads(memcachedPost)
-    else:
-        post = None
-    return post
+        memcachedPost = pickle.loads(memcachedPost)
+    return memcachedPost
 
 # Takes a post object and inserts it into the memcache
 def setPostInMemcache(post):
     post_id_str = str(post['id'])
-    memcacheClient.set(str(post_id_str), pickle.dumps(post))
+    memcacheClient.set(post_id_str, pickle.dumps(post))
 
 def updatePostInMemcache(post_id, title, content):
     # need get the existing post from memcache since it has the other information
@@ -33,5 +31,4 @@ def updatePostInMemcache(post_id, title, content):
 
 def deletePostInMemcache(id):
     post_id_str = str(id)
-    isPostDeleteSuccess = memcacheClient.delete(post_id_str, False)
-    return isPostDeleteSuccess
+    memcacheClient.delete(post_id_str)
